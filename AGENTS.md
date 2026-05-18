@@ -35,9 +35,9 @@ Optional: `origin` (defaults to home airport from `home.md`), `passengers` (defa
 
 ## Tools available
 
-- `fli`: flight search CLI (https://github.com/punitarani/fli). Install with `pipx install flights`. JSON output via `--format json`.
+- `fli`: flight search CLI (https://github.com/punitarani/fli). Install with `pipx install flights`. JSON output via `--format json`. Handles ~90% of queries on its own.
+- **`dev-browser` skill (required for full functionality).** `fli` can't always answer multi-city pricing, basic-vs-main fare splits on specific carriers, lap-infant pricing confirmation, or queries where Google Flights' internal API has shifted. When `fli` returns nothing useful, fall back to `dev-browser` to load airline or Google Flights pages directly and read the price. Do not silently skip the trip on a `fli` failure; try `dev-browser` first, then log the failure if even that doesn't work.
 - An email-sending tool. This repo was originally built around `gwsp` / `gwsw` Google Workspace CLIs; substitute whatever the current Claude Code session can reach (Gmail MCP server, another CLI, etc.). The agent looks up recipient addresses from the `travelers:` mapping in `home.md`.
-- `dev-browser` skill: fallback for cases `fli` can't handle (multi-city pricing nuance, specific airline checkout, etc.).
 
 ## Research procedure (runs every 3 hours)
 

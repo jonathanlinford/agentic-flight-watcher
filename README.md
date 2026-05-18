@@ -1,129 +1,71 @@
+<p align="center">
+  <img src="assets/banner.png" alt="agentic-flight-watcher: a trip.md on the left, a price-history chart trending down to $285 on the right" width="100%">
+</p>
+
 # agentic-flight-watcher
 
-A Claude Code agent that watches flight prices for trips you describe in plain markdown, builds up a per-trip price history, and emails you when it's time to book.
-
-## What this is
-
-Drop a `<slug>.trip.md` file into the project root describing a trip: dates, destination, passengers, preferences, free-form notes. A scheduled Claude Code job runs every 3 hours, prices the most plausible itineraries using [`fli`](https://github.com/punitarani/fli) (an open-source Google Flights CLI), appends each observation to a JSONL price-history log, and sends you an email when:
-
-1. the current price falls below a threshold you set in the trip file, or
-2. it bottoms out relative to the trailing 30-day window.
-
-The first run for any new trip sends a research briefing email so you know what's currently on the market and what to expect from here.
-
-The project also ships a self-contained `dashboard.html` (no server required) that visualizes every trip, its price history, and the trip's full configuration.
-
-## Why "agentic"?
-
-Almost every step (parsing trip notes, deciding which date and routing permutations are worth pricing, judging whether the current price is good enough to wake the user up) is a judgment call. This isn't a static script with hardcoded rules; it's a list of instructions a language model executes each tick, with `AGENTS.md` as the system prompt and your trip notes as the spec.
-
-## Agent-agnostic
-
-Instructions live in `AGENTS.md` per the [AGENTS.md](https://agents.md) convention. `CLAUDE.md` is a symlink to `AGENTS.md` so Claude Code reads it without extra config. If you use a different agent runtime that looks for its own filename, add an analogous symlink (`ln -s AGENTS.md WHATEVER.md`); the content is the same.
+Describe a trip in plain markdown. An agent prices it every few hours, keeps a per-trip price history, and emails you when it's time to book. A self-contained `dashboard.html` renders everything at a glance.
 
 ## Layout
 
 ```
 agentic-flight-watcher/
-├── AGENTS.md                canonical agent instructions (read every cron run)
-├── CLAUDE.md                symlink to AGENTS.md so Claude Code finds it
-├── home.md                  your defaults (gitignored; copy from home.example.md)
-├── home.example.md          template for home.md
-├── dashboard.html           regenerated each run; open with file:// in any browser
-├── <slug>.trip.md           one per active trip; you author these
-├── <slug>.log.jsonl         price history per trip (auto-appended)
-├── archive/                 completed or cancelled trips move here
-└── lib/
-    ├── example.trip.md         copy this to <slug>.trip.md to add a new trip
-    ├── build-dashboard.py      regenerates dashboard.html
-    └── dashboard-template.html the dashboard's single-page template
+├── AGENTS.md              agent instructions, read every cron tick
+├── CLAUDE.md              symlink to AGENTS.md so Claude Code picks it up
+├── home.md                your defaults (gitignored; copy from home.example.md)
+├── home.example.md        template for home.md
+├── dashboard.html         self-contained price-history view
+├── <slug>.trip.md         one per active trip; you author these
+├── <slug>.log.jsonl       observation log per trip (auto-appended)
+├── archive/               completed and cancelled trips
+└── lib/                   templates plus the dashboard generator
 ```
-
-## How a cron tick works
-
-1. Read every `<slug>.trip.md`, merging in defaults from `home.md`.
-2. Auto-archive trips whose travel windows are in the past.
-3. Price the most plausible itinerary permutations via `fli` (origin and destination alternates, flexible dates within the window, stop and airline filters).
-4. If this is the first run for a trip (no log file yet), send a research briefing email and seed the log.
-5. Otherwise append the observation to `<slug>.log.jsonl` and decide whether to send a buy-signal email.
-6. Regenerate `dashboard.html`.
-
-The full procedure is in `AGENTS.md` (and `CLAUDE.md`, which is a symlink to it).
-
-## Requirements
-
-- [Claude Code](https://claude.com/claude-code) (the CLI). The scheduled job runs inside a Claude Code session.
-- Python 3.10+ (for the dashboard generator).
-- [`fli`](https://github.com/punitarani/fli) for flight pricing. The PyPI package is called `flights`; the installed binary is `fli`.
-- A way for the agent to send email. This repo was originally built around Google Workspace CLIs (`gwsp` / `gwsw`), but any tool the agent can call works. Edit the email step in `AGENTS.md` to match your tooling.
 
 ## Setup
 
-1. Clone:
+### Agentic setup
 
-   ```sh
-   git clone https://github.com/jonathanlinford/agentic-flight-watcher.git
-   cd agentic-flight-watcher
-   ```
+After cloning, ask any agent that reads `AGENTS.md` (Claude Code, etc.):
 
-2. Install `fli`:
+> Set up this project per the Manual setup section in `README.md`. Install `fli`, walk me through filling in `home.md` from the template, schedule the cron, and help me add my first trip.
 
-   ```sh
-   pipx install flights
-   ```
+The agent handles every step. The one thing it can't do is run the `pipx install` line on your machine; it will pause and ask you to.
 
-3. Configure your home defaults:
+### Manual setup
 
-   ```sh
-   cp home.example.md home.md
-   ```
+1. `pipx install flights` (PyPI package is `flights`; the installed binary is `fli`).
+2. `cp home.example.md home.md` and edit. The only required fields are your home airport and the `travelers:` name-to-email map; everything else is commented and optional.
+3. `claude` from the repo root, then ask: *"schedule the flight watcher to run every 3 hours per AGENTS.md, durable."* Claude Code's scheduled tasks fire only while a Claude session is running and auto-expire after 7 days, so keep `claude` open in a persistent terminal (`tmux`, `screen`) and ask Claude to reschedule weekly. To delegate to system cron, wrap `claude -p "execute the procedure in AGENTS.md"` in a crontab line.
+4. To verify, ask Claude *"run the procedure once now."* It will research any trips you've added, regenerate `dashboard.html`, and report back.
 
-   Edit `home.md` with your home airport, default passengers, traveler-to-email map, cabin and airline preferences, and booking heuristics.
-
-4. Open the project in Claude Code:
-
-   ```sh
-   cd agentic-flight-watcher
-   claude
-   ```
-
-5. Inside Claude Code, ask: *"schedule the flight watcher to run every 3 hours."* Claude will register a recurring job that fires the procedure in `CLAUDE.md`. The schedule lives in the Claude Code session and auto-expires after 7 days; ask Claude to reschedule when needed.
-
-## Adding a trip
+## Trips
 
 ```sh
 cp lib/example.trip.md tokyo-vacation.trip.md
 ```
 
-Edit the new file. The YAML frontmatter at the top is the source of truth; everything outside it is freeform notes the agent reads for nuance.
+Edit the YAML frontmatter (`destination`, `depart_window`, `return_window`, `travelers` at minimum) and add free-form notes underneath. The agent reads the prose too: "no red-eyes," "prefer Delta nonstop with the lap infant on the return," "drive to ORD instead of connecting" are all valid. `lib/example.trip.md` documents every supported field.
 
-Minimum frontmatter:
+To complete a trip, move its `.trip.md` and `.log.jsonl` into `archive/`. The cron also does this automatically once both travel windows are in the past.
 
-```yaml
----
-destination: ORD
-depart_window: [2026-10-14, 2026-10-14]
-return_window: [2026-10-18, 2026-10-18]
-travelers: [you, partner]
----
-```
+## Dashboard
 
-`lib/example.trip.md` documents every supported field. Notes can encode preferences the schema doesn't capture, e.g. "no red-eyes," "prefer Delta nonstop," "lap infant on the return." The agent reads the prose, not just the YAML.
+`lib/build-dashboard.py` regenerates `dashboard.html` from every trip and log file. The cron runs it each tick. The output is a single file with all data inlined and Chart.js plus marked.js pulled from CDN. Open it with `file://` in any browser; no server.
 
-## Completing a trip
+## How it works
 
-Move both `<slug>.trip.md` and `<slug>.log.jsonl` into `archive/`. The cron job also does this automatically once both travel windows are in the past.
+Each cron tick the agent reads every `<slug>.trip.md`, merges defaults from `home.md`, prices the most plausible itinerary permutations with [`fli`](https://github.com/punitarani/fli), appends observations to the trip's log, decides whether to email a buy signal, and regenerates the dashboard. A trip's first run sends a research briefing email instead of a buy signal so you start with context. The full procedure lives in `AGENTS.md`.
 
-## The dashboard
+## Requirements
 
-`python3 lib/build-dashboard.py` regenerates `dashboard.html` from every trip and log file. The cron job runs this automatically. Open the file directly in any browser; it's fully self-contained (data inlined, Chart.js and marked.js loaded from CDN). No server needed.
+- [Claude Code](https://claude.com/claude-code), Python 3.10+, [`fli`](https://github.com/punitarani/fli).
+- The **`dev-browser`** skill for Claude Code. `fli` covers most queries, but multi-city itineraries, basic-vs-main fare splits, lap-infant confirmation, and transient Google Flights API regressions all need a real browser fallback. The agent uses `dev-browser` for those.
+- **A Google Workspace CLI is preferred** (the original setup uses `gws` with `gwsp` / `gwsw` aliases for two accounts). It gives the agent two things in one place: notification email for buy signals, and calendar access so the agent can sanity-check trip dates against your actual calendar before recommending a booking. Substitute Gmail MCP or any other email tool Claude Code can reach if you don't run `gws`; calendar-aware logic will be limited or unavailable in that case. The send step in `AGENTS.md` is the only place to swap.
 
-## License
+## Agent runtime
 
-MIT. See `LICENSE`.
+Instructions live in `AGENTS.md` per the [AGENTS.md convention](https://agents.md). `CLAUDE.md` is a 9-byte symlink to it so Claude Code finds it without extra config. For other runtimes, `ln -s AGENTS.md WHATEVER.md`.
 
-## Acknowledgments
+## License & credits
 
-- [`fli`](https://github.com/punitarani/fli) does the heavy lifting on flight pricing by reverse-engineering Google Flights.
-- Chart.js and marked.js power the dashboard.
-- Built on top of [Claude Code](https://claude.com/claude-code).
+MIT. Built on [`fli`](https://github.com/punitarani/fli), Chart.js, marked.js, and [Claude Code](https://claude.com/claude-code).

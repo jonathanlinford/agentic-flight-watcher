@@ -17,6 +17,9 @@
 .claude/
 .cursor/
 
+# Local scratch
+/banner-candidates/
+
 # Python
 __pycache__/
 *.pyc
