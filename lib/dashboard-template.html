@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flights</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@11/marked.min.js"></script>
+<style>
+:root {
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --surface-2: #f5f3ee;
+  --border: #e7e2d8;
+  --text: #1c1a16;
+  --muted: #78716c;
+  --accent: #0369a1;
+  --accent-soft: #e0f2fe;
+  --success: #15803d;
+  --success-soft: #dcfce7;
+  --warning: #b45309;
+  --danger: #b91c1c;
+  --shadow: 0 1px 2px rgba(28,26,22,0.04), 0 8px 24px -12px rgba(28,26,22,0.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e0d0b;
+    --surface: #1a1815;
+    --surface-2: #232019;
+    --border: #2e2a22;
+    --text: #f5f1e8;
+    --muted: #a8a29e;
+    --accent: #38bdf8;
+    --accent-soft: #0c4a6e;
+    --success: #4ade80;
+    --success-soft: #14532d;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.container { max-width: 1180px; margin: 0 auto; padding: 0 1.5rem; }
+header {
+  padding: 2.5rem 0 1.25rem;
+}
+.title-row { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+h1 {
+  font-size: 2.25rem; margin: 0;
+  font-weight: 700; letter-spacing: -0.03em;
+}
+.eyebrow {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--muted); margin-bottom: 0.3rem;
+}
+.meta { color: var(--muted); font-size: 0.85rem; margin-top: 0.5rem; }
+.tabs {
+  display: flex; gap: 0.4rem; margin: 1.25rem 0 1.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  padding: 0.55rem 0.1rem;
+  margin-right: 1.25rem;
+  border: none;
+  background: none;
+  font-size: 0.92rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  font-family: inherit;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.tab .count {
+  font-size: 0.7rem; color: var(--muted);
+  background: var(--surface-2);
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  margin-left: 0.35rem;
+  vertical-align: 1px;
+}
+main { padding-bottom: 4rem; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1.1rem;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.35rem 1.35rem 1.25rem;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  box-shadow: var(--shadow);
+  display: flex; flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: "";
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+}
+.card:hover::before { opacity: 1; }
+.card.archived { opacity: 0.72; }
+.card.archived::before { background: var(--muted); }
+.card.notified { border-color: var(--success); }
+.card.notified::before { background: var(--success); opacity: 1; }
+.route {
+  font-size: 1.3rem; font-weight: 600;
+  letter-spacing: -0.015em;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.route .arrow { color: var(--muted); font-weight: 400; }
+.slug { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.4rem; }
+.dates {
+  color: var(--muted); font-size: 0.85rem; margin-top: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+.pax {
+  color: var(--muted); font-size: 0.85rem; margin-top: 0.1rem;
+}
+.sparkline-wrap {
+  height: 48px; margin: 0.9rem -0.35rem 0.4rem;
+  position: relative;
+}
+.sparkline-empty {
+  height: 48px; margin: 0.9rem 0 0.4rem;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+.price-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem;
+  margin-top: 0.75rem; padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+}
+.price-current {
+  font-size: 1.55rem; font-weight: 700; letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.price-current.below-target { color: var(--success); }
+.price-current.empty { color: var(--muted); font-size: 0.95rem; font-weight: 500; }
+.price-delta {
+  font-size: 0.8rem; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.price-delta.down { color: var(--success); }
+.price-delta.up { color: var(--danger); }
+.badge {
+  display: inline-block;
+  font-size: 0.68rem; padding: 0.2rem 0.6rem; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent);
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+  vertical-align: 2px;
+}
+.badge.success { background: var(--success-soft); color: var(--success); }
+.empty-state {
+  grid-column: 1 / -1;
+  padding: 4rem 2rem; text-align: center;
+  color: var(--muted);
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  font-size: 0.95rem;
+}
+.empty-state code {
+  background: var(--surface-2); padding: 0.15rem 0.45rem; border-radius: 4px;
+  font-size: 0.85em;
+}
+/* modal */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(15,12,8,0.55);
+  backdrop-filter: blur(4px);
+  display: none;
+  align-items: flex-start; justify-content: center;
+  padding: 2rem 1rem;
+  overflow-y: auto;
+  z-index: 50;
+  animation: fadeIn 0.18s ease;
+}
+.modal-overlay.open { display: flex; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+  background: var(--surface);
+  border-radius: 18px;
+  max-width: 860px; width: 100%;
+  padding: 2.25rem 2.25rem 2rem;
+  position: relative;
+  box-shadow: 0 24px 48px -12px rgba(0,0,0,0.25);
+  animation: slideUp 0.22s cubic-bezier(0.16,1,0.3,1);
+}
+@keyframes slideUp { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+.modal-close {
+  position: absolute; top: 1rem; right: 1rem;
+  width: 32px; height: 32px;
+  background: var(--surface-2); border: none;
+  border-radius: 8px;
+  font-size: 1.1rem; cursor: pointer;
+  color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  font-family: inherit;
+}
+.modal-close:hover { background: var(--border); color: var(--text); }
+.modal h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.65rem; letter-spacing: -0.02em; font-weight: 700;
+}
+.section { margin-top: 1.75rem; }
+.section-title {
+  font-size: 0.7rem; text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--muted);
+  margin-bottom: 0.65rem; font-weight: 600;
+}
+.kv {
+  display: grid; grid-template-columns: max-content 1fr;
+  gap: 0.4rem 1.25rem;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; }
+.summary-strip {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.5rem; margin-top: 0.75rem;
+}
+.stat {
+  background: var(--surface-2);
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+}
+.stat .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.2rem; }
+.stat .value { font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.markdown { font-size: 0.95rem; line-height: 1.65; }
+.markdown h1, .markdown h2, .markdown h3 { letter-spacing: -0.015em; font-weight: 600; }
+.markdown h2 { font-size: 1.1rem; margin-top: 1.5rem; }
+.markdown h3 { font-size: 0.98rem; margin-top: 1.2rem; }
+.markdown code { background: var(--surface-2); padding: 0.12rem 0.4rem; border-radius: 4px; font-size: 0.85em; }
+.markdown ul, .markdown ol { padding-left: 1.4rem; }
+.markdown li { margin: 0.25rem 0; }
+.markdown p { margin: 0.6rem 0; }
+.markdown strong { font-weight: 600; }
+.obs-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.obs-table th, .obs-table td { padding: 0.5rem 0.65rem; border-bottom: 1px solid var(--border); text-align: left; }
+.obs-table th { color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.obs-table tbody tr:hover { background: var(--surface-2); }
+.detail-chart-wrap { height: 280px; }
+@media (max-width: 600px) {
+  .modal { padding: 1.5rem 1.25rem; border-radius: 14px; }
+  h1 { font-size: 1.75rem; }
+  .grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="eyebrow">Flight watcher</div>
+    <div class="title-row">
+      <h1>Trips</h1>
+    </div>
+    <div class="meta" id="meta"></div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-filter="active">Active <span class="count" id="count-active">0</span></button>
+      <button class="tab" data-filter="archive">Archive <span class="count" id="count-archive">0</span></button>
+      <button class="tab" data-filter="all">All <span class="count" id="count-all">0</span></button>
+    </nav>
+  </header>
+  <main>
+    <div class="grid" id="grid"></div>
+  </main>
+</div>
+<div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal" id="modal">
+    <button class="modal-close" id="modal-close" aria-label="Close">✕</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+<script type="application/json" id="dashboard-data">__DASHBOARD_DATA__</script>
+<script>
+(function () {
+  const DATA = JSON.parse(document.getElementById('dashboard-data').textContent);
+  let currentFilter = 'active';
+  let chartInstances = [];
+  let detailChart = null;
+
+  function fmtMoney(n) {
+    if (n == null || Number.isNaN(n)) return 'n/a';
+    return '$' + Math.round(n).toLocaleString();
+  }
+  function fmtWindow(w) {
+    if (!Array.isArray(w) || !w.length) return '';
+    if (w.length === 1 || w[0] === w[1]) return w[0];
+    return w[0] + ' to ' + w[w.length - 1];
+  }
+  function sortByTs(obs, asc) {
+    return [...obs].sort((a, b) => {
+      const av = a.ts || '', bv = b.ts || '';
+      if (av === bv) return 0;
+      return (av < bv ? -1 : 1) * (asc ? 1 : -1);
+    });
+  }
+  function latestObs(trip) {
+    const obs = trip.observations || [];
+    if (!obs.length) return null;
+    return sortByTs(obs, false)[0];
+  }
+  function trendDelta(trip) {
+    const obs = sortByTs(trip.observations || [], true);
+    if (obs.length < 2) return null;
+    const latest = obs[obs.length - 1].price_usd;
+    const prev = obs[obs.length - 2].price_usd;
+    if (latest == null || prev == null) return null;
+    return latest - prev;
+  }
+  function rangeStats(obs) {
+    const prices = obs.map(o => o.price_usd).filter(p => p != null);
+    if (!prices.length) return null;
+    prices.sort((a, b) => a - b);
+    return {
+      min: prices[0],
+      max: prices[prices.length - 1],
+      median: prices[Math.floor(prices.length / 2)],
+      count: prices.length,
+    };
+  }
+  function destroyCharts() {
+    chartInstances.forEach(c => { try { c.destroy(); } catch (e) {} });
+    chartInstances = [];
+  }
+  function destroyDetailChart() {
+    if (detailChart) { try { detailChart.destroy(); } catch (e) {} detailChart = null; }
+  }
+
+  function updateCounts() {
+    const active = DATA.trips.filter(t => !t.archived).length;
+    const archive = DATA.trips.filter(t => t.archived).length;
+    document.getElementById('count-active').textContent = active;
+    document.getElementById('count-archive').textContent = archive;
+    document.getElementById('count-all').textContent = DATA.trips.length;
+  }
+
+  function renderGrid() {
+    destroyCharts();
+    const grid = document.getElementById('grid');
+    const filtered = DATA.trips.filter(t => {
+      if (currentFilter === 'active') return !t.archived;
+      if (currentFilter === 'archive') return t.archived;
+      return true;
+    });
+
+    if (!filtered.length) {
+      grid.innerHTML = `<div class="empty-state">
+        No trips here yet. Drop a <code>&lt;slug&gt;.trip.md</code> file into the project root to start watching.
+      </div>`;
+      return;
+    }
+
+    grid.innerHTML = filtered.map((trip, i) => {
+      const fm = trip.frontmatter || {};
+      const latest = latestObs(trip);
+      const target = fm.target_price_usd;
+      const belowTarget = latest && target && latest.price_usd <= target;
+      const notified = (trip.observations || []).some(o => o.notified);
+      const delta = trendDelta(trip);
+      let deltaHtml = '';
+      if (delta != null && Math.abs(delta) >= 1) {
+        const cls = delta < 0 ? 'down' : 'up';
+        const arrow = delta < 0 ? '▼' : '▲';
+        deltaHtml = `<span class="price-delta ${cls}">${arrow} ${fmtMoney(Math.abs(delta))}</span>`;
+      }
+      const lapInfants = fm.lap_infants ? ` + ${fm.lap_infants} lap infant${fm.lap_infants > 1 ? 's' : ''}` : '';
+      const obsCount = (trip.observations || []).length;
+      const sparkInner = obsCount >= 2
+        ? `<div class="sparkline-wrap"><canvas data-spark-idx="${i}"></canvas></div>`
+        : `<div class="sparkline-empty">${obsCount === 1 ? '1 observation so far' : 'no observations yet'}</div>`;
+      const trailingBadge = notified
+        ? '<span class="badge success">buy signaled</span>'
+        : (target ? `<span class="badge">target ${fmtMoney(target)}</span>` : '');
+      return `
+        <article class="card ${trip.archived ? 'archived' : ''} ${notified ? 'notified' : ''}" data-slug="${trip.slug}">
+          <div class="slug">${trip.slug}</div>
+          <div class="route">
+            <span>${fm.origin || '?'}</span>
+            <span class="arrow">→</span>
+            <span>${fm.destination || '?'}</span>
+          </div>
+          <div class="dates">${fmtWindow(fm.depart_window)}${fm.return_window ? '  ·  back ' + fmtWindow(fm.return_window) : ''}</div>
+          <div class="pax">${fm.passengers || 1} pax${lapInfants}</div>
+          ${sparkInner}
+          <div class="price-row">
+            <span class="price-current ${belowTarget ? 'below-target' : ''} ${latest ? '' : 'empty'}">
+              ${latest ? fmtMoney(latest.price_usd) : 'no data yet'}
+            </span>
+            <span style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.2rem;">
+              ${trailingBadge}
+              ${deltaHtml}
+            </span>
+          </div>
+        </article>
+      `;
+    }).join('');
+
+    document.querySelectorAll('.card').forEach(card => {
+      card.addEventListener('click', () => openModal(card.dataset.slug));
+    });
+
+    filtered.forEach((trip, i) => {
+      const obs = sortByTs(trip.observations || [], true);
+      if (obs.length < 2) return;
+      const canvas = document.querySelector(`canvas[data-spark-idx="${i}"]`);
+      if (!canvas) return;
+      const chart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: obs.map(() => ''),
+          datasets: [{
+            data: obs.map(o => o.price_usd),
+            borderColor: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#0369a1',
+            backgroundColor: 'rgba(3,105,161,0.12)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 0,
+            borderWidth: 1.8,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+          scales: { x: { display: false }, y: { display: false } },
+          animation: false,
+          interaction: { intersect: false },
+        },
+      });
+      chartInstances.push(chart);
+    });
+  }
+
+  function openModal(slug) {
+    const trip = DATA.trips.find(t => t.slug === slug);
+    if (!trip) return;
+    const fm = trip.frontmatter || {};
+    const obs = sortByTs(trip.observations || [], false);
+    const ordered = sortByTs(trip.observations || [], true);
+    const stats = rangeStats(obs);
+    const body = document.getElementById('modal-body');
+
+    const kvRows = Object.entries(fm).map(([k, v]) => {
+      let val = Array.isArray(v) ? v.join(', ') : (v == null ? '' : v);
+      return `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(val))}</dd>`;
+    }).join('');
+
+    const statsHtml = stats ? `
+      <div class="summary-strip">
+        <div class="stat"><div class="label">Current</div><div class="value">${fmtMoney(obs[0].price_usd)}</div></div>
+        <div class="stat"><div class="label">Low</div><div class="value">${fmtMoney(stats.min)}</div></div>
+        <div class="stat"><div class="label">Median</div><div class="value">${fmtMoney(stats.median)}</div></div>
+        <div class="stat"><div class="label">High</div><div class="value">${fmtMoney(stats.max)}</div></div>
+        <div class="stat"><div class="label">Observations</div><div class="value">${stats.count}</div></div>
+      </div>
+    ` : '';
+
+    const chartHtml = ordered.length
+      ? '<div class="detail-chart-wrap"><canvas id="detailChart"></canvas></div>'
+      : '<div class="empty-state" style="padding: 1.75rem;">No price observations yet. The next cron run will populate this.</div>';
+
+    const tableHtml = ordered.length ? `
+      <div class="section">
+        <div class="section-title">Recent observations</div>
+        <table class="obs-table">
+          <thead><tr><th>When</th><th>Depart</th><th>Return</th><th>Price</th><th>Airline</th><th>Stops</th><th>Dur (min)</th></tr></thead>
+          <tbody>
+            ${obs.slice(0, 24).map(o => `
+              <tr>
+                <td>${o.ts ? escapeHtml(o.ts.slice(0,16).replace('T', ' ')) : ''}</td>
+                <td>${escapeHtml(o.depart || 'n/a')}</td>
+                <td>${escapeHtml(o.return || 'n/a')}</td>
+                <td><strong>${fmtMoney(o.price_usd)}</strong></td>
+                <td>${escapeHtml(o.airline || 'n/a')}</td>
+                <td>${o.stops != null ? o.stops : 'n/a'}</td>
+                <td>${o.duration_min != null ? o.duration_min : 'n/a'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : '';
+
+    body.innerHTML = `
+      <div class="slug">${escapeHtml(trip.slug)}${trip.archived ? '  ·  archived' : ''}</div>
+      <h2>${escapeHtml(fm.origin || '?')} → ${escapeHtml(fm.destination || '?')}</h2>
+      <div class="meta">${escapeHtml(fmtWindow(fm.depart_window))}${fm.return_window ? '  ·  back ' + escapeHtml(fmtWindow(fm.return_window)) : ''}</div>
+
+      ${statsHtml}
+
+      <div class="section">
+        <div class="section-title">Price history</div>
+        ${chartHtml}
+      </div>
+
+      ${tableHtml}
+
+      <div class="section">
+        <div class="section-title">Configuration</div>
+        <dl class="kv">${kvRows}</dl>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Notes</div>
+        <div class="markdown">${marked.parse(trip.body || '')}</div>
+      </div>
+    `;
+
+    document.getElementById('modal-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    destroyDetailChart();
+    if (ordered.length) {
+      const ctx = document.getElementById('detailChart');
+      detailChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ordered.map(o => o.ts ? o.ts.slice(0, 10) : ''),
+          datasets: [{
+            label: 'Best price (USD)',
+            data: ordered.map(o => o.price_usd),
+            borderColor: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#0369a1',
+            backgroundColor: 'rgba(3,105,161,0.12)',
+            fill: true,
+            tension: 0.28,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            borderWidth: 2,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: { label: (ctx) => '$' + Math.round(ctx.parsed.y).toLocaleString() },
+            },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 11 }, color: getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() } },
+            y: { ticks: { font: { size: 11 }, callback: v => '$' + v, color: getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() }, grid: { color: getComputedStyle(document.documentElement).getPropertyValue('--border').trim() } },
+          },
+        },
+      });
+    }
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+    destroyDetailChart();
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target.id === 'modal-overlay') closeModal();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+  });
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentFilter = tab.dataset.filter;
+      renderGrid();
+    });
+  });
+
+  const activeCount = DATA.trips.filter(t => !t.archived).length;
+  const meta = document.getElementById('meta');
+  const when = DATA.generated_at ? new Date(DATA.generated_at).toLocaleString() : '';
+  meta.textContent = `${activeCount} active trip${activeCount === 1 ? '' : 's'}${when ? '  ·  generated ' + when : ''}`;
+
+  updateCounts();
+  renderGrid();
+})();
+</script>
+</body>
+</html>

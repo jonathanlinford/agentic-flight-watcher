@@ -1,0 +1,24 @@
+# Personal trip data (root-anchored so the template under lib/ is kept)
+/*.trip.md
+/*.log.jsonl
+/home.md
+
+# Generated artifact (regenerate via lib/build-dashboard.py)
+/dashboard.html
+
+# Archived personal trips
+/archive/*
+!/archive/.gitkeep
+
+# OS / editor / agent runtime noise
+.DS_Store
+.idea/
+.vscode/
+.claude/
+.cursor/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
